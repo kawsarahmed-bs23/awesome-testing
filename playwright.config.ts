@@ -6,6 +6,7 @@ const isCI = !!process.env.CI;
 /**
  * Headless by default; pass `--headed` on the CLI (or use the *:headed npm scripts)
  * for visual inspection. No config edits needed to switch modes.
+ * The *:headed scripts use one browser and one worker, so only one window is open at a time.
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -32,6 +33,8 @@ export default defineConfig({
     video: 'retain-on-failure',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
+    // SLOW_MO=500 slows every action by 500ms so headed runs are easy to follow.
+    launchOptions: { slowMo: Number(process.env.SLOW_MO ?? 0) },
   },
 
   projects: [

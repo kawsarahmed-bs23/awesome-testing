@@ -1,95 +1,180 @@
 # Awesome Testing
 
-A production-ready **Playwright + TypeScript** starter template with multi-environment configuration, a fixture-driven Page Object Model, tag-based suites, CI workflows and Playwright MCP support for AI agents.
+End-to-end test automation with **Playwright + TypeScript**: multi-environment configuration, a fixture-driven Page Object Model, tag-based suites, HTML reports, GitHub Actions CI and Playwright MCP support for AI agents.
 
-Out of the box it targets the public demo app [the-internet.herokuapp.com](https://the-internet.herokuapp.com) so every test passes on a fresh clone. Point `BASE_URL` at your own app to make it yours.
+Out of the box it targets the public demo app [the-internet.herokuapp.com](https://the-internet.herokuapp.com), so every test passes on a fresh clone. Point `BASE_URL` at your own app to make it yours.
 
-## Features
+**Contents**
 
-- **Zero-instantiate POM** — Page Objects are auto-injected via custom fixtures: `async ({ loginPage, dashboardPage }) => { ... }`.
-- **Type-safe environments** — `local`, `dev`, `staging`, `prod` loaded from `config/.env.<env>` and validated with `zod`. Tests refuse to start if config is missing or malformed.
-- **Headless by default, headed on demand** — no config edits, just `--headed` or the `*:headed` scripts.
-- **Cross-platform scripts** via `cross-env` (Windows, macOS, Linux).
-- **Tags** — `@smoke`, `@regression`, `@auth`.
-- **Failure artifacts only** — trace, screenshot and video are kept only for failed tests.
-- **CI** — GitHub Actions PR matrix (chromium, firefox, webkit, mobile) and a scheduled prod smoke run.
-- **AI-ready** — `@playwright/mcp` configured for Claude Code (`.mcp.json`) and Cursor (`.cursor/mcp.json`), plus `CLAUDE.md` agent rules.
+1. [Setup (everyone, once)](#1-setup-everyone-once)
+2. [QA guide: running tests](#2-qa-guide-running-tests)
+3. [Viewing reports](#3-viewing-reports)
+4. [Developer guide: writing tests](#4-developer-guide-writing-tests)
+5. [Environments](#5-environments)
+6. [CI (GitHub Actions)](#6-ci-github-actions)
+7. [Command reference](#7-command-reference)
+8. [Troubleshooting](#8-troubleshooting)
 
-## Requirements
+---
 
-- Node.js **20+**
+## 1. Setup (everyone, once)
 
-## Getting started
+**Requirements:** [Node.js 20+](https://nodejs.org/) and Git.
 
 ```bash
+git clone https://github.com/learnwithkawsar/awesome-testing.git
+cd awesome-testing
 npm install
 npx playwright install
-cp config/.env.example config/.env.staging   # skip if the file already exists
-npm test
 ```
 
-## Scripts
-
-| Script                                     | What it does                                   |
-| ------------------------------------------ | ---------------------------------------------- |
-| `npm test`                                 | All tests, default env (`staging`), headless   |
-| `npm run test:local` / `test:local:headed` | Against `config/.env.local`                    |
-| `npm run test:dev`                         | Against `config/.env.dev`, headless            |
-| `npm run test:dev:headed`                  | Against `config/.env.dev`, visible browser     |
-| `npm run test:staging`                     | Against `config/.env.staging`, headless        |
-| `npm run test:staging:headed`              | Against `config/.env.staging`, visible browser |
-| `npm run test:prod:smoke`                  | Only `@smoke` tests against `config/.env.prod` |
-| `npm run test:smoke` / `test:regression`   | Filter by tag (current env)                    |
-| `npm run test:ui`                          | Playwright UI mode                             |
-| `npm run test:debug`                       | Playwright Inspector                           |
-| `npm run report`                           | Open the last HTML report                      |
-| `npm run codegen`                          | Record locators with Playwright codegen        |
-| `npm run typecheck`                        | `tsc --noEmit` (strict)                        |
-| `npm run lint` / `lint:fix`                | ESLint, zero warnings allowed                  |
-| `npm run format` / `format:check`          | Prettier                                       |
-| `npm run mcp`                              | Start the Playwright MCP server manually       |
-
-Extra Playwright CLI flags can be passed after `--`:
+Create your environment file from the template (the `.env.<env>` files are not committed):
 
 ```bash
-npm run test:staging -- --project=chromium --grep "logs in"
+cp config/.env.example config/.env.staging
 ```
 
-## Environments
+On Windows PowerShell use `Copy-Item config/.env.example config/.env.staging`. Do the same for `dev`, `prod` or `local` if you need them, then edit the values (URL, username, password).
 
-| Variable         | Required       | Description                                                 |
-| ---------------- | -------------- | ----------------------------------------------------------- |
-| `ENV`            | set by scripts | `local` \| `dev` \| `staging` \| `prod` (default `staging`) |
-| `BASE_URL`       | yes            | App URL, used as Playwright `baseURL`                       |
-| `API_URL`        | no             | API base URL for `apiHelper` (falls back to `BASE_URL`)     |
-| `ADMIN_USERNAME` | yes            | Login user                                                  |
-| `ADMIN_PASSWORD` | yes            | Login password                                              |
+Check everything works:
 
-`config/.env.*` files are git-ignored except `.env.example`. Real environment variables (e.g. CI secrets) override the file when they are non-empty.
+```bash
+npm run test:staging
+```
 
-### CI configuration
+---
 
-Set these in **GitHub → Settings → Secrets and variables → Actions** to target your real app (otherwise the demo values from `.env.example` are used):
+## 2. QA guide: running tests
 
-- Variables: `STAGING_BASE_URL`, `STAGING_API_URL`, `PROD_BASE_URL`, `PROD_API_URL`
-- Secrets: `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_PASSWORD`, `PROD_ADMIN_USERNAME`, `PROD_ADMIN_PASSWORD`
+You don't need to write code to run the suite. All commands run from the project folder.
 
-## Project structure
+### Watch the tests in a browser (headed)
+
+```bash
+npm run test:staging:headed
+```
+
+This opens **one Chromium window at a time** and runs the tests one after another, so you can follow what happens. Each test opens a fresh window and closes it when it finishes; this keeps tests independent (no shared login or cookies).
+
+Slow it down to follow each click and keystroke:
+
+```bash
+npx cross-env SLOW_MO=500 npm run test:staging:headed
+```
+
+Watch every browser (Chromium, Firefox, WebKit, mobile) in parallel. This opens several windows at once:
+
+```bash
+npm run test:staging:headed:all
+```
+
+### Run fast, without a visible browser (headless)
+
+```bash
+npm run test:staging     # all tests, all 4 browsers
+npm run test:dev         # against the dev environment
+npm run test:prod:smoke  # only @smoke tests, against prod
+```
+
+### Run only some tests
+
+| Goal                            | Command                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| Only smoke tests                | `npm run test:smoke`                                                               |
+| Only regression tests           | `npm run test:regression`                                                          |
+| Only Chromium                   | `npm run test:chromium`                                                            |
+| One file                        | `npx playwright test tests/auth/login.spec.ts`                                     |
+| Tests whose name contains text  | `npx playwright test -g "logs in"`                                                 |
+| One browser, headed, one window | `npx cross-env ENV=staging playwright test --headed --project=firefox --workers=1` |
+
+Extra Playwright options can be added to any npm script after `--`:
+
+```bash
+npm run test:staging -- --project=chromium --grep @auth
+```
+
+### Interactive UI mode (recommended for exploring)
+
+```bash
+npm run test:ui
+```
+
+Opens the Playwright UI in **one window**: pick tests from a list, run them, and step through each action with a live DOM snapshot, network calls and console logs. Good for investigating a failure.
+
+### Step-by-step debugging
+
+```bash
+npm run test:debug -- tests/auth/login.spec.ts
+```
+
+Opens the Playwright Inspector so you can pause and step through each action.
+
+---
+
+## 3. Viewing reports
+
+Every run writes an **HTML report** to `playwright-report/` and failure artifacts to `test-results/`. The terminal also prints a live pass/fail list while tests run.
+
+### Open the HTML report
+
+```bash
+npm run report
+```
+
+This starts a local server and opens the last report in your browser. In the report you can:
+
+- Filter by passed / failed / flaky / skipped, by browser project, or by tag (`@smoke`, `@regression`, `@auth`).
+- Open a test to see each step and its duration.
+- For **failed** tests: see the error, the **screenshot**, the **video** of the run and the **trace**.
+
+The report is overwritten on each run. Copy the `playwright-report/` folder if you want to keep one.
+
+### Open a trace (time-travel debugging)
+
+Click **Trace** on a failed test in the HTML report, or open it directly:
+
+```bash
+npx playwright show-trace test-results/<test-folder>/trace.zip
+```
+
+The trace viewer shows every action with before/after DOM snapshots, network requests and console output. You can also drag a `trace.zip` onto [trace.playwright.dev](https://trace.playwright.dev).
+
+### What is kept
+
+| Artifact    | When              | Where                            |
+| ----------- | ----------------- | -------------------------------- |
+| HTML report | Every run         | `playwright-report/index.html`   |
+| Screenshot  | Failed tests only | `test-results/<test>/`           |
+| Video       | Failed tests only | `test-results/<test>/video.webm` |
+| Trace       | Failed tests only | `test-results/<test>/trace.zip`  |
+
+To always record traces (e.g. for a demo), add `--trace on` to the command.
+
+### Reports from CI
+
+On GitHub, open **Actions → the workflow run → Artifacts** and download `playwright-report-<browser>` (or `smoke-prod-report`). Unzip it and run:
+
+```bash
+npx playwright show-report path/to/unzipped-folder
+```
+
+---
+
+## 4. Developer guide: writing tests
+
+### How it fits together
 
 ```text
-.cursor/mcp.json            MCP config for Cursor
-.mcp.json                   MCP config for Claude Code
-.github/workflows/          test-pr.yml, smoke-prod.yml
-config/                     env.config.ts + .env.<env> files
-src/fixtures/pageFixtures.ts  extended `test` with injected pages
-src/pages/                  base.page.ts, login.page.ts, dashboard.page.ts
-src/utils/                  logger.ts, apiHelper.ts
-src/types/env.d.ts          ProcessEnv typings
-tests/auth/login.spec.ts    auth flows (@auth @smoke @regression)
-tests/smoke/healthCheck.spec.ts  fast health checks (@smoke)
+config/env.config.ts          Loads config/.env.<ENV>, validates it with zod, exports `env`
+src/pages/*.page.ts           Page Objects: locators + actions + assertions for one page
+src/fixtures/pageFixtures.ts  Injects Page Objects into tests by name
+tests/**/*.spec.ts            Test scenarios, written only against fixtures
+playwright.config.ts          Browsers, timeouts, reporters, failure artifacts
 ```
 
-## Writing a test
+### Writing a test
+
+Import `test` and `expect` from the fixtures file and ask for pages by name. Never create Page Objects with `new` in a spec (ESLint blocks it).
 
 ```ts
 import { test } from '@fixtures/pageFixtures';
@@ -101,13 +186,143 @@ test('user logs in', { tag: ['@smoke', '@auth'] }, async ({ loginPage, dashboard
 });
 ```
 
-To add a page: create `src/pages/<name>.page.ts` extending `BasePage`, register it in `src/fixtures/pageFixtures.ts`, then request it by name in your spec. See [CLAUDE.md](CLAUDE.md) for the full conventions.
+Every test needs at least one tag:
 
-## Using Playwright MCP with Claude Code
+| Tag           | Meaning                                                   |
+| ------------- | --------------------------------------------------------- |
+| `@smoke`      | Fast, critical path, read-only (safe to run against prod) |
+| `@regression` | Full functional coverage                                  |
+| `@auth`       | Authentication / authorization flows                      |
 
-`.mcp.json` registers the `playwright` MCP server. Open the project in Claude Code, approve the server, then ask e.g.:
+### Adding a new page
+
+1. Create `src/pages/settings.page.ts`:
+
+   ```ts
+   import { type Locator, type Page } from '@playwright/test';
+   import { BasePage } from './base.page';
+
+   export class SettingsPage extends BasePage {
+     protected readonly path = '/settings';
+     readonly saveButton: Locator;
+
+     constructor(page: Page) {
+       super(page);
+       this.saveButton = page.getByRole('button', { name: 'Save' });
+     }
+
+     async assertIsVisible(): Promise<void> {
+       await this.assertHeadingVisible('Settings');
+     }
+   }
+   ```
+
+2. Register it in `src/fixtures/pageFixtures.ts`: add `settingsPage: SettingsPage` to the `Fixtures` type and a `settingsPage` entry in `base.extend`.
+3. Use it in a spec: `async ({ settingsPage }) => { ... }`.
+
+Locator priority: `getByRole` → `getByLabel` → `getByPlaceholder` → `getByText` → `getByTestId` → CSS as a last resort. No XPath, no `waitForTimeout`.
+
+Tools that help find locators:
+
+```bash
+npm run codegen -- https://the-internet.herokuapp.com/login
+```
+
+### Before you push
+
+```bash
+npm run typecheck
+npm run lint
+npm run format
+npm run test:chromium
+```
+
+CI runs the same checks and fails on any lint warning.
+
+### Using AI agents (Claude Code / Cursor)
+
+`.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor) register the Playwright MCP server, which lets the agent drive a real browser. Approve the server when prompted, then ask for example:
 
 > Open the staging app's /settings page with the Playwright MCP, read its accessibility tree, and create a SettingsPage object, fixture and @regression spec following CLAUDE.md.
+
+[CLAUDE.md](CLAUDE.md) contains the rules agents follow in this repo.
+
+---
+
+## 5. Environments
+
+| Variable         | Required       | Description                                                 |
+| ---------------- | -------------- | ----------------------------------------------------------- |
+| `ENV`            | set by scripts | `local` \| `dev` \| `staging` \| `prod` (default `staging`) |
+| `BASE_URL`       | yes            | App URL, used as Playwright `baseURL`                       |
+| `API_URL`        | no             | API base URL for `apiHelper` (falls back to `BASE_URL`)     |
+| `ADMIN_USERNAME` | yes            | Login user                                                  |
+| `ADMIN_PASSWORD` | yes            | Login password                                              |
+| `SLOW_MO`        | no             | Milliseconds to pause between actions (e.g. `500`)          |
+| `DEBUG_LOGS`     | no             | `true` prints debug-level framework logs                    |
+
+- The `ENV` value picks the file `config/.env.<ENV>`.
+- Real environment variables (e.g. CI secrets) override the file when they are non-empty.
+- If a required value is missing or invalid, the run stops immediately with a clear error listing what is wrong.
+- `config/.env.*` files are git-ignored except `.env.example`. Never commit real credentials.
+
+---
+
+## 6. CI (GitHub Actions)
+
+| Workflow                                             | Trigger                                           | What it runs                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [PR Tests](.github/workflows/test-pr.yml)            | Pull request or push to `main`                    | Typecheck, lint, format check, then all tests headless on Chromium, Firefox, WebKit and Mobile Chrome in parallel |
+| [Production Smoke](.github/workflows/smoke-prod.yml) | Daily 06:00 UTC, or manually from the Actions tab | `@smoke` tests on Chromium against prod                                                                           |
+
+To target your real app, set these in **Settings → Secrets and variables → Actions** (otherwise the demo values from `.env.example` are used):
+
+- Variables: `STAGING_BASE_URL`, `STAGING_API_URL`, `PROD_BASE_URL`, `PROD_API_URL`
+- Secrets: `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_PASSWORD`, `PROD_ADMIN_USERNAME`, `PROD_ADMIN_PASSWORD`
+
+In CI, failed tests are retried up to 2 times; a test that passes on retry is marked **flaky** in the report.
+
+---
+
+## 7. Command reference
+
+| Script                                                                  | What it does                                               |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `npm test`                                                              | All tests, default env (`staging`), headless, all browsers |
+| `npm run test:local` / `test:dev` / `test:staging`                      | All tests against that env, headless                       |
+| `npm run test:local:headed` / `test:dev:headed` / `test:staging:headed` | Headed, Chromium only, one window at a time                |
+| `npm run test:staging:headed:all`                                       | Headed, all browsers in parallel                           |
+| `npm run test:prod:smoke`                                               | `@smoke` tests against prod                                |
+| `npm run test:smoke` / `test:regression`                                | Filter by tag (current env)                                |
+| `npm run test:chromium`                                                 | Chromium only, headless                                    |
+| `npm run test:ui`                                                       | Playwright UI mode                                         |
+| `npm run test:debug`                                                    | Playwright Inspector                                       |
+| `npm run report`                                                        | Open the last HTML report                                  |
+| `npm run codegen`                                                       | Record actions and locators                                |
+| `npm run install:browsers`                                              | Install browsers plus OS dependencies                      |
+| `npm run typecheck`                                                     | Strict TypeScript check                                    |
+| `npm run lint` / `lint:fix`                                             | ESLint (zero warnings allowed)                             |
+| `npm run format` / `format:check`                                       | Prettier                                                   |
+| `npm run mcp`                                                           | Start the Playwright MCP server manually                   |
+
+---
+
+## 8. Troubleshooting
+
+**Many browser windows open in headed mode.**
+Use `npm run test:<env>:headed` (one browser, one worker, one window at a time) or `npm run test:ui` (everything in a single window). Each test intentionally gets its own fresh browser context, which Playwright shows as its own window; running tests as tabs of one window would make them share cookies and login state, so tests could affect each other.
+
+**`Invalid environment configuration for ENV="staging"`.**
+`config/.env.staging` is missing or has an empty/invalid value. Copy it from `config/.env.example` and fill it in.
+
+**`Executable doesn't exist` / browser not found.**
+Run `npx playwright install`.
+
+**A test times out against the demo site.**
+the-internet.herokuapp.com is a free public server and is sometimes slow. Re-run the test; against your own app this should not happen. Use the trace to see where it waited.
+
+**Port already in use when opening the report.**
+`npx playwright show-report --port 9324`
 
 ## License
 

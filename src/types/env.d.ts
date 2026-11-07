@@ -8,6 +8,7 @@ declare global {
       ADMIN_PASSWORD?: string;
       CI?: string;
       DEBUG_LOGS?: string;
+      SLOW_MO?: string;
     }
   }
 }
