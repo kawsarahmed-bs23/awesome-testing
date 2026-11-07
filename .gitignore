@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+
+# Environment files (only the example template is committed)
+.env
+.env.local
+.env.*
+config/.env.*
+!config/.env.example
+!.env.example
+
+# Playwright MCP output
+.playwright-mcp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

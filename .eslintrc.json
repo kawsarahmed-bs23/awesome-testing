@@ -1,0 +1,67 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:playwright/recommended",
+    "prettier"
+  ],
+  "ignorePatterns": ["node_modules/", "test-results/", "playwright-report/", "blob-report/"],
+  "rules": {
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/await-thenable": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "playwright/no-wait-for-timeout": "error",
+    "playwright/no-force-option": "error",
+    "playwright/expect-expect": [
+      "warn",
+      {
+        "assertFunctionNames": [
+          "assertIsVisible",
+          "assertOnPage",
+          "assertHeadingVisible",
+          "assertErrorMessage",
+          "assertWelcomeMessage"
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "NewExpression[callee.name=/Page$/]",
+            "message": "Do not instantiate Page Objects in specs. Request them as fixtures from @fixtures/pageFixtures instead."
+          }
+        ],
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@playwright/test",
+                "importNames": ["test"],
+                "message": "Import `test` from @fixtures/pageFixtures so Page Objects are auto-injected."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

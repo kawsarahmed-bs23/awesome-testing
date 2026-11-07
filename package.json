@@ -1,0 +1,48 @@
+{
+  "name": "awesome-testing",
+  "version": "1.0.0",
+  "description": "Awesome Testing - Playwright TypeScript multi-environment starter template with fixture-driven POM and MCP support",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:local": "cross-env ENV=local playwright test",
+    "test:local:headed": "cross-env ENV=local playwright test --headed",
+    "test:dev": "cross-env ENV=dev playwright test",
+    "test:dev:headed": "cross-env ENV=dev playwright test --headed",
+    "test:staging": "cross-env ENV=staging playwright test",
+    "test:staging:headed": "cross-env ENV=staging playwright test --headed",
+    "test:prod:smoke": "cross-env ENV=prod playwright test --grep @smoke",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:regression": "playwright test --grep @regression",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "install:browsers": "playwright install --with-deps",
+    "mcp": "playwright-mcp",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts --max-warnings 0",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.84",
+    "@playwright/test": "^1.44.0",
+    "@types/node": "^20.12.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-playwright": "^1.6.2",
+    "prettier": "^3.3.0",
+    "typescript": "~5.4.0",
+    "zod": "^3.23.0"
+  }
+}

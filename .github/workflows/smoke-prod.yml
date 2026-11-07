@@ -1,0 +1,37 @@
+name: Production Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every day at 06:00 UTC
+    - cron: '0 6 * * *'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENV: prod
+      BASE_URL: ${{ vars.PROD_BASE_URL }}
+      API_URL: ${{ vars.PROD_API_URL }}
+      ADMIN_USERNAME: ${{ secrets.PROD_ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.PROD_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Create env file from template
+        run: cp config/.env.example config/.env.prod
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run @smoke tests against prod
+        run: npx playwright test --grep @smoke --project=chromium
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: smoke-prod-report
+          path: playwright-report/
+          retention-days: 14
