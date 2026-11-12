@@ -26,6 +26,10 @@ Generated tests fail most often because the locators or the expected text were g
 
 The snapshot output is your locator source. If MCP isn't available, read the page's HTML with the browser tools you have, but don't invent locators.
 
+Check the **assertion targets** live too, not just the elements you click. Text that looks like a label in a screenshot may be a bare text node that `getByText` or `getByLabel` won't match. A wrong assertion locator fails the same way a wrong action locator does.
+
+Playwright MCP saves snapshots and logs to `.playwright-mcp/`. That folder is git-ignored; leave it alone.
+
 ## 3. Reuse before you create
 
 Check what exists, so you extend instead of duplicate:
@@ -71,6 +75,7 @@ export class DropdownPage extends BasePage {
 ```
 
 - **Locator priority:** `getByRole` → `getByLabel` → `getByPlaceholder` → `getByText` → `getByTestId` → CSS. CSS only as a last resort, with a comment saying why the accessible options don't work. No XPath.
+- **Elements with no accessible name** (e.g. a checkbox with no `<label>`): scope by role inside the nearest named container and pick by position, such as `page.getByRole('main').getByRole('checkbox').nth(0)`. Hide the index behind a named method or map (`checkbox('checkbox 1')`) and comment why. Missing labels are an accessibility bug, so add it to the test case document's open questions as well.
 - **Methods are user intent:** `selectOption('Option 1')`, not `clickSecondItem()`.
 - **Assertions that need page knowledge** become `assert*` methods. Specs stay readable as user stories.
 - **No `waitForTimeout`, no `{ force: true }`.** Web-first assertions (`await expect(locator).toBeVisible()`) already wait.
@@ -78,7 +83,7 @@ export class DropdownPage extends BasePage {
 
 ## 5. Register the fixture
 
-In `src/fixtures/pageFixtures.ts`, add the page object to the `Fixtures` type and to `base.extend`, alphabetically next to the others:
+In `src/fixtures/pageFixtures.ts`, add the page object to the `Fixtures` type and to `base.extend`, plus its import, following the existing order (no need to reorder what's there):
 
 ```ts
 dropdownPage: async ({ page }, use) => {
@@ -124,7 +129,7 @@ npx playwright test tests/<feature> --project=chromium
 npx playwright test tests/<feature> --project=chromium --repeat-each=3
 ```
 
-The `--repeat-each=3` run catches flakiness while the context is fresh. If a test is flaky, re-snapshot the page and fix the locator or the assertion; don't add waits or retries. Run `npm run format` at the end.
+The `--repeat-each=3` run catches flakiness while the context is fresh. If a test is flaky, re-snapshot the page and fix the locator or the assertion; don't add waits or retries. At the end, format only the files you touched (`npx prettier --write <files>`), so the diff doesn't pick up unrelated formatting changes.
 
 ## 8. Report
 

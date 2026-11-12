@@ -40,13 +40,13 @@ For each case decide:
 
 - **Priority:** P0 (critical path, blocks release), P1 (important), P2 (nice to have).
 - **Tags** (CLAUDE.md rule 8, at least one):
-  - `@smoke` only if it's fast, critical **and read-only**. Smoke runs against prod, so anything that creates, edits or deletes data is never `@smoke`.
+  - `@smoke` only if it's fast, critical **and read-only**. Smoke runs against prod, so anything that creates, edits or deletes data is never `@smoke`. "Read-only" means nothing changes on the server: toggling a checkbox or typing into a form you don't submit is fine; submitting, saving or deleting is not.
   - `@regression` for full functional coverage.
   - `@auth` for authentication and authorization flows.
   - `@a11y` for accessibility scans, if the repo already uses that tag.
 - **Automate as:**
   - `E2E` (UI through page objects),
-  - `API` (through the `apiHelper` fixture; faster and more stable when the UI isn't the point),
+  - `API` (through the `apiHelper` fixture; faster and more stable when the UI isn't the point; only applies when the behaviour has a server endpoint),
   - `E2E + mock` (UI with `page.route()` for error and edge states),
   - `Manual` (with a reason: visual judgement, third-party payment, etc.).
 
@@ -85,7 +85,7 @@ Last updated: <YYYY-MM-DD>
 
 Writing guidance:
 
-- **IDs:** `TC-<FEATURE>-NNN`, uppercase feature, zero-padded. Never renumber existing IDs.
+- **IDs:** `TC-<FEATURE>-NNN`, uppercase feature, zero-padded. Renumbering is fine while you're still drafting. Once the document has been shared or any spec uses an ID, never renumber: retire a dropped case by marking it `Removed` instead of reusing its number.
 - **Steps** describe user intent ("Enter a wrong password"), not locators. Locators belong in page objects.
 - **Test data** names the kind of data, not literals: "admin user from env", "unique unknown username", "password of 129 characters". Real credentials never appear in the document.
 - **Expected results** must be observable and specific: the exact message, the URL, what is visible or hidden. "Works correctly" can't be automated.
@@ -93,5 +93,7 @@ Writing guidance:
 ## 5. Hand off
 
 Show the user a short summary in chat: the number of cases by priority, anything marked Manual and why, and the open questions. Ask them to review the document. Then stop.
+
+The one exception: if the user asked for design and automation in the same request ("design test cases and automate them"), show the summary and carry on with `write-e2e-test`, saying clearly that the table hasn't been reviewed. They asked not to wait.
 
 Once they approve (possibly after edits), the `write-e2e-test` skill automates the cases, using the IDs in the test titles.
