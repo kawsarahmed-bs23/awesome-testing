@@ -43,6 +43,11 @@ Always run `npm run typecheck && npm run lint` and the affected specs (`--projec
    `@smoke` = fast, critical path, safe to run against prod (read-only, no data mutation).
 9. Tests must be independent and parallel-safe (`fullyParallel: true`). Use `apiHelper` for setup/teardown instead of UI where possible.
 
+## Project skills
+
+- **`test-case-design`** (`.claude/skills/test-case-design/`): use it when asked what to test or for test cases; it writes `docs/test-cases/<feature>.md` and stops for review.
+- **`write-e2e-test`** (`.claude/skills/write-e2e-test/`): use it when writing or extending specs and page objects; it extends the workflow below with live exploration, reuse checks and a `--repeat-each=3` flakiness run.
+
 ## Adding a new page (workflow for agents)
 
 1. **Inspect the live app with Playwright MCP.** Use `browser_navigate` to `BASE_URL` + path (see `config/.env.staging`), then `browser_snapshot` to read the accessibility tree. Prefer the snapshot over screenshots.
