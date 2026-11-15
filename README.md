@@ -82,6 +82,7 @@ npm run test:prod:smoke  # only @smoke tests, against prod
 | ------------------------------- | ---------------------------------------------------------------------------------- |
 | Only smoke tests                | `npm run test:smoke`                                                               |
 | Only regression tests           | `npm run test:regression`                                                          |
+| Only accessibility tests        | `npm run test:a11y`                                                                |
 | Only Chromium                   | `npm run test:chromium`                                                            |
 | One file                        | `npx playwright test tests/auth/login.spec.ts`                                     |
 | Tests whose name contains text  | `npx playwright test -g "logs in"`                                                 |
@@ -198,6 +199,9 @@ For a dashboard artifact: `npx monocart show-report path/to/unzipped-folder/inde
 config/env.config.ts          Loads config/.env.<ENV>, validates it with zod, exports `env`
 src/pages/*.page.ts           Page Objects: locators + actions + assertions for one page
 src/fixtures/pageFixtures.ts  Injects Page Objects into tests by name
+src/fixtures/authState.ts     Paths of saved login sessions (STORAGE_STATE)
+src/data/*.ts                 Test data builders (aUser(), Users, uniqueId())
+tests/setup/auth.setup.ts     Logs in once per run and saves the session
 tests/**/*.spec.ts            Test scenarios, written only against fixtures
 playwright.config.ts          Browsers, timeouts, reporters, failure artifacts
 ```
@@ -208,10 +212,11 @@ Import `test` and `expect` from the fixtures file and ask for pages by name. Nev
 
 ```ts
 import { test } from '@fixtures/pageFixtures';
+import { Users } from '@data/index';
 
-test('user logs in', { tag: ['@smoke', '@auth'] }, async ({ loginPage, dashboardPage, env }) => {
+test('user logs in', { tag: ['@smoke', '@auth'] }, async ({ loginPage, dashboardPage }) => {
   await loginPage.goto();
-  await loginPage.submitLoginForm(env.ADMIN_USERNAME, env.ADMIN_PASSWORD);
+  await loginPage.login(Users.admin());
   await dashboardPage.assertIsVisible();
 });
 ```
@@ -223,6 +228,54 @@ Every test needs at least one tag:
 | `@smoke`      | Fast, critical path, read-only (safe to run against prod) |
 | `@regression` | Full functional coverage                                  |
 | `@auth`       | Authentication / authorization flows                      |
+| `@a11y`       | Accessibility (axe-core) scans; add alongside another tag |
+
+### Accessibility checks (axe-core)
+
+Every Page Object has `assertNoA11yViolations()`. It scans the current page with [axe-core](https://github.com/dequelabs/axe-core) against WCAG 2.1 A/AA. On failure it lists each broken rule, a help link and the elements involved. The full axe results are attached to the HTML report as `accessibility-scan`.
+
+```ts
+test('settings page is accessible', { tag: ['@regression', '@a11y'] }, async ({ settingsPage }) => {
+  await settingsPage.goto();
+  await settingsPage.assertIsVisible(); // let the page finish rendering first
+  await settingsPage.assertNoA11yViolations();
+});
+```
+
+Options: `include` / `exclude` (CSS selectors), `disableRules` (axe rule IDs) and `tags`. Disable a rule only for the page that has the known issue, with a comment and ticket link. Run just these tests with `npm run test:a11y`. See [tests/a11y/accessibility.spec.ts](tests/a11y/accessibility.spec.ts).
+
+Automated scans catch only part of accessibility problems. They don't replace keyboard and screen-reader testing.
+
+### Starting tests already logged in
+
+The `setup` project ([tests/setup/auth.setup.ts](tests/setup/auth.setup.ts)) logs in once per run and saves the session to `playwright/.auth/admin.json` (git-ignored). Every browser project depends on it, so it runs automatically, even with `--grep` or `--project`.
+
+Tests start **logged out** by default. To reuse the saved session in a spec, add one line at the top of the file:
+
+```ts
+import { test, STORAGE_STATE } from '@fixtures/pageFixtures';
+
+test.use({ storageState: STORAGE_STATE.admin });
+```
+
+Only login/logout tests should go through the login form. Everything else that needs a user should use the saved session. See [tests/secure/secureArea.spec.ts](tests/secure/secureArea.spec.ts).
+
+To add another role, add a path to `STORAGE_STATE` in `src/fixtures/authState.ts` and a matching test in `auth.setup.ts`.
+
+### Test data builders
+
+Build test data in [src/data/](src/data/) instead of writing literals in specs. Builders start from valid defaults (the configured admin user), so a test only says what is different:
+
+```ts
+import { aUser, Users, uniqueId } from '@data/index';
+
+Users.admin(); // credentials from config/.env.<ENV>
+Users.unknown(); // unique, non-existent username
+aUser().withWrongPassword().build(); // same as Users.withWrongPassword()
+aUser().withUsername(uniqueId('qa')).build();
+```
+
+Generated values use `uniqueId()`, so parallel workers and repeated runs never collide. Add new builders as `src/data/<thing>.builder.ts` and export them from `src/data/index.ts`.
 
 ### Adding a new page
 
@@ -277,6 +330,47 @@ CI runs the same checks and fails on any lint warning.
 
 [CLAUDE.md](CLAUDE.md) contains the rules agents follow in this repo.
 
+#### Watch Claude work in your own Chrome (Claude in Chrome)
+
+The Playwright MCP above drives a separate browser. If you'd rather **watch Claude click through the app in your everyday Chrome**, use the Claude in Chrome extension:
+
+1. Install the **Claude in Chrome** extension from the Chrome Web Store and sign in with the same Claude account you use for Claude Code.
+2. Connect it to Claude Code:
+   - **Desktop app:** set "Preferred browser" to Chrome in the app's settings.
+   - **CLI:** start with `claude --chrome`, or run `/chrome` inside a session.
+3. Ask Claude to use Chrome, for example:
+
+   > Using Claude in Chrome, open the staging app's /login page and walk through the "blocks direct access to the secure area" scenario from tests/auth/login.spec.ts. Tell me if the page behaves differently from what the spec expects.
+
+   > Using Claude in Chrome, open /settings and suggest accessible locators for a SettingsPage object.
+
+Claude opens its own tab group in your Chrome window, and you can see every navigation and click as it happens.
+
+Which tool to use:
+
+| You want to…                                        | Use                                               |
+| --------------------------------------------------- | ------------------------------------------------- |
+| Run the test suite and watch it                     | `npm run test:staging:headed` (add `SLOW_MO=500`) |
+| Have Claude explore a page and write a Page Object  | Playwright MCP (`.mcp.json`)                      |
+| Watch Claude walk through a scenario in your Chrome | Claude in Chrome                                  |
+
+Notes:
+
+- Claude in Chrome drives the browser by hand. It doesn't run `npx playwright test`; anything worth keeping should become a spec.
+- It uses your real Chrome profile and sign-ins. Point it at dev or staging, not prod.
+- Claude won't type passwords into sites for you. Sign in yourself in that tab, then let Claude continue.
+
+#### Project skills: design test cases, then automate them
+
+Two Claude Code skills in [.claude/skills/](.claude/skills/) turn a feature into reviewed test cases and then into specs that follow this repo's rules. Claude uses them automatically when your request matches; you can also name them.
+
+| Skill                                                          | Ask for example                                                                   | Produces                                                                                                                                                                        |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`test-case-design`](.claude/skills/test-case-design/SKILL.md) | "Design test cases for the /dropdown page" or "What should we test for JIRA-123?" | `docs/test-cases/<feature>.md`: a table with IDs (`TC-DROPDOWN-001`), steps, expected results, priority, tags and how to automate each case. Claude stops here for your review. |
+| [`write-e2e-test`](.claude/skills/write-e2e-test/SKILL.md)     | "Automate docs/test-cases/dropdown.md" or "Add a test for the checkboxes page"    | Walks through the page with Playwright MCP, then writes the page object, fixture and tagged spec, and runs typecheck, lint and the spec 3 times to catch flakiness.             |
+
+The usual flow is: design → you review and edit the table → automate. Test titles start with the case ID, so a failing test points back to its design.
+
 ---
 
 ## 5. Environments
@@ -323,7 +417,7 @@ In CI, failed tests are retried up to 2 times; a test that passes on retry is ma
 | `npm run test:local:headed` / `test:dev:headed` / `test:staging:headed` | Headed, Chromium only, one window at a time                |
 | `npm run test:staging:headed:all`                                       | Headed, all browsers in parallel                           |
 | `npm run test:prod:smoke`                                               | `@smoke` tests against prod                                |
-| `npm run test:smoke` / `test:regression`                                | Filter by tag (current env)                                |
+| `npm run test:smoke` / `test:regression` / `test:a11y`                  | Filter by tag (current env)                                |
 | `npm run test:chromium`                                                 | Chromium only, headless                                    |
 | `npm run test:ui`                                                       | Playwright UI mode                                         |
 | `npm run test:debug`                                                    | Playwright Inspector                                       |

@@ -8,7 +8,7 @@ A Playwright + TypeScript end-to-end test framework with:
 
 - **Multi-environment config** — `config/.env.<env>` validated by `zod` in `config/env.config.ts`.
 - **Fixture-driven Page Object Model** — Page Objects are injected into tests via `src/fixtures/pageFixtures.ts`.
-- **Tag-based suites** — `@smoke`, `@regression`, `@auth`.
+- **Tag-based suites** — `@smoke`, `@regression`, `@auth`, plus `@a11y` for accessibility scans.
 - **Playwright MCP** — `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor) start `@playwright/mcp`.
 
 ## Commands
@@ -42,7 +42,15 @@ Always run `npm run typecheck && npm run lint` and the affected specs (`--projec
    test('does X', { tag: ['@smoke', '@regression'] }, async ({ loginPage }) => { ... });
    ```
    `@smoke` = fast, critical path, safe to run against prod (read-only, no data mutation).
-9. Tests must be independent and parallel-safe (`fullyParallel: true`). Use `apiHelper` for setup/teardown instead of UI where possible.
+9. **Accessibility:** use `await xPage.assertNoA11yViolations()` (axe-core, WCAG 2.1 A/AA, defined on `BasePage`) after the page has rendered; tag such tests `@a11y` plus `@regression`. Never call `AxeBuilder` from specs. `disableRules` only per page, with a comment and ticket link.
+10. Tests must be independent and parallel-safe (`fullyParallel: true`). Use `apiHelper` for setup/teardown instead of UI where possible.
+11. **Don't log in through the UI** except in tests about login itself. Reuse the saved session with `test.use({ storageState: STORAGE_STATE.admin })` (produced by the `setup` project in `tests/setup/auth.setup.ts`). New roles go in `src/fixtures/authState.ts` plus a matching setup test.
+12. **Test data comes from builders** in `src/data/` (`Users.admin()`, `aUser().withWrongPassword().build()`, `uniqueId('x')`), not literals in specs. Anything a test creates must use `uniqueId()` so parallel runs don't collide.
+
+## Project skills
+
+- **`test-case-design`** (`.claude/skills/test-case-design/`): use it when asked what to test or for test cases; it writes `docs/test-cases/<feature>.md` and stops for review.
+- **`write-e2e-test`** (`.claude/skills/write-e2e-test/`): use it when writing or extending specs and page objects; it extends the workflow below with live exploration, reuse checks and a `--repeat-each=3` flakiness run.
 
 ## Adding a new page (workflow for agents)
 
@@ -71,6 +79,12 @@ Always run `npm run typecheck && npm run lint` and the affected specs (`--projec
 5. **Write the spec** under `tests/<feature>/<name>.spec.ts`, tagged, using only fixtures.
 6. **Verify**: `npm run typecheck && npm run lint && npx playwright test tests/<feature> --project=chromium`. If a locator is flaky, re-snapshot with MCP and fix the Page Object — do not add waits or retries.
 
+## Browsing the app as an agent
+
+- **Playwright MCP** (`.mcp.json`) is the default for inspecting pages and writing Page Objects (see above).
+- **Claude in Chrome** (`mcp__claude-in-chrome__*` tools) when the user asks to watch, or to use their own Chrome. Open a new tab in your tab group, never act on the user's other tabs, and stay on dev/staging. Don't type passwords: ask the user to sign in in that tab.
+- Whatever you learn while browsing goes into Page Objects and specs, so it runs headless in CI.
+
 ## Environment
 
 - `ENV` selects `config/.env.<ENV>` (`local | dev | staging | prod`, default `staging`).
@@ -83,10 +97,14 @@ Always run `npm run typecheck && npm run lint` and the affected specs (`--projec
 ```
 config/env.config.ts        zod schema + env loader (exports `env`)
 src/pages/*.page.ts         Page Objects (extend BasePage)
-src/fixtures/pageFixtures.ts  test = base.extend<Fixtures>(...)
+src/fixtures/pageFixtures.ts  test = base.extend<Fixtures>(...); re-exports STORAGE_STATE
+src/fixtures/authState.ts   STORAGE_STATE paths (playwright/.auth/*.json, git-ignored)
+src/data/*.ts               test data builders (aUser, Users, uniqueId) — import from '@data/index'
+tests/setup/auth.setup.ts   `setup` project: logs in once, saves storageState
+src/utils/accessibility.ts  axe-core scan + violation formatting (used by BasePage.assertNoA11yViolations)
 src/utils/apiHelper.ts      API helper for hybrid tests (fixture: apiHelper)
 src/utils/logger.ts         createLogger(scope); DEBUG_LOGS=true enables debug
 tests/**                    Specs only — no locators, no `new XPage()`
-playwright.config.ts        projects: chromium, firefox, webkit, Mobile Chrome; reporters: list, html, monocart (dashboard)
+playwright.config.ts        projects: setup → chromium, firefox, webkit, Mobile Chrome; reporters: list, html, monocart (dashboard)
 .github/workflows/report.yml  runs the suite on main and publishes the dashboard to GitHub Pages
 ```
